@@ -1,0 +1,134 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "This template creates an Amazon VPC and subnet with the required configuration for a cross-realm trust.",
+  "Resources": {
+    "VPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.0.0.0/16",
+        "EnableDnsSupport": true,
+        "EnableDnsHostnames": true,
+        "InstanceTenancy": "default",
+        "Tags": [{
+          "Key": "Name",
+          "Value": "AWSKNOXVPC"
+        }]
+      }
+    },
+    "PublicSubnet": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "CidrBlock": "10.0.1.0/24",
+        "MapPublicIpOnLaunch": "True",
+        "Tags": [{
+          "Key": "Name",
+          "Value": "AWSKNOXSubnet"
+        }]
+      }
+    },
+    "InternetGateway": {
+      "Type": "AWS::EC2::InternetGateway",
+      "Properties": {
+        "Tags": [{
+          "Key": "Name",
+          "Value": "AWSKNOXGateway"
+        }]
+      }
+    },
+    "MyGatewayAttachment": {
+      "Type": "AWS::EC2::VPCGatewayAttachment",
+      "Properties": {
+        "InternetGatewayId": {
+          "Ref": "InternetGateway"
+        },
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "PublicRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Ref": "VPC"
+        }
+      }
+    },
+    "PublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Ref": "InternetGateway"
+        }
+      },
+      "DependsOn": [
+        "MyGatewayAttachment"
+      ]
+    },
+    "PublicSubnetRouteAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "PublicRouteTable"
+        },
+        "SubnetId": {
+          "Ref": "PublicSubnet"
+        }
+      }
+    },
+    "InstanceSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "CloudFormationGroup",
+        "VpcId": {
+          "Ref": "VPC"
+        },
+        "SecurityGroupIngress": [{
+          "IpProtocol": "-1",
+          "CidrIp": "10.0.0.0/16"
+        }],
+        "Tags": [{
+          "Key": "Name",
+          "Value": "AWSKNOXSecurityGroup"
+        }]
+      }
+    },
+    "VPCDefaultSecurityGroupIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Fn::GetAtt": ["VPC", "DefaultSecurityGroup"]
+        },
+        "IpProtocol": "-1",
+        "CidrIp": "10.0.0.0/16"
+      }
+    }
+  },
+  "Outputs": {
+    "SubnetID": {
+      "Description": "Use this subnet ID for your AD domain controller and EMR cluster.",
+      "Value": {
+        "Ref": "PublicSubnet"
+      }
+    },
+    "SecurityGroup": {
+      "Description": "Use this security group ID for your AD domain controller.",
+      "Value": {
+        "Fn::GetAtt": ["InstanceSecurityGroup", "GroupId"]
+      }
+    },
+    "VPCID": {
+      "Description": "Use this VPC ID for your AD domain controller and EMR cluster.",
+      "Value": {
+        "Ref": "VPC"
+      }
+    }
+  }
+}

@@ -1,0 +1,254 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+  "Description" : "Attach IAM Role to an EC2",
+  "Parameters" : {
+    "paramKeyName": {
+      "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
+      "Type": "AWS::EC2::KeyPair::KeyName",
+      "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+    },
+    "paramInstanceType" : {
+      "Description" : "EC2 instance specs configuration",
+      "Type" : "String",
+      "Default" : "m5.xlarge",
+      "AllowedValues" : ["m5.large","m5.xlarge"]
+    },
+    "paramClientIP": {
+      "Description": "The IP address range that can be used to connect to the RDS instances and EC2 instance from your local machine.It must be a valid IP CIDR range of the form x.x.x.x/x.Pls get your address using checkip.amazonaws.com or whatsmyip.org",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "It must be a valid IP CIDR range of the form x.x.x.x/x. Suggest to enable access to your IP address only. Pls get your address using checkip.amazonaws.com or whatsmyip.org."
+    },
+    "paramVPCID": {
+      "Description": "Select the Virtual Private Cloud (VPC) that defines the virtual networking environment for this replication instance",
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "paramSecurityGroupId": {
+      "Description": "Name of security group",
+      "Type": "AWS::EC2::SecurityGroup::Id"
+    },
+    "paramEC2Subnet": {
+      "Description": "ID of subnet (e.g., subnet-a0246dcd)",
+      "Type": "AWS::EC2::Subnet::Id"
+    },
+    "paramLdapHostName": {
+      "Description": "Provide Ldap Host Name",
+      "Type": "String",
+      "Default": "awsknox.com"
+    },
+    "paramLdapPort": {
+      "Description": "Provide Ldap Port number",
+      "Type": "String",
+      "Default": "389"
+    },
+    "paramLdapBindUserName": {
+      "Description": "Provide Ldap Bind User Name",
+      "Type": "String",
+      "Default": "CN=awsadmin,CN=Users,DC=awsknox,DC=com"
+    },
+    "paramLdapBindUserPassword": {
+      "Description": "Provide Ldap Bind User Password",
+      "Type": "String",
+      "Default": "CheckSum123"
+    },
+    "paramLdapSearchBase": {
+      "Description": "Provide Ldap Search Base",
+      "Type": "String",
+      "Default": "CN=Users,DC=awshadoop,DC=com"
+    },
+    "paramLdapUserSearchAttributeName": {
+      "Description": "Provide Ldap User Search Attribute Name",
+      "Type": "String",
+      "Default": "sAMAccountName"
+    },
+    "paramLdapUserObjectClass": {
+      "Description": "Provide Ldap User Object Class",
+      "Type": "String",
+      "Default": "person"
+    },
+    "paramLdapGroupSearchBase": {
+      "Description": "Provide Ldap Group Search base",
+      "Type": "String",
+      "Default": "dc=awshadoop,dc=com"
+    },
+    "paramLdapGroupObjectClass": {
+      "Description": "Provide Ldap Group Object Class",
+      "Type": "String",
+      "Default": "group"
+    },
+    "paramLdapMemberAttribute": {
+      "Description": "Ldap Member attribute",
+      "Type": "String",
+      "Default": "member"
+    },
+    "paramTempS3Bucket": {
+      "Description": "Provide S3 Bucket Location where the krb5.conf and knox keytabl files exists.",
+      "Type": "String"
+    },
+    "paramKnoxKerberosPrincipal": {
+      "Description": "Knox Kerberos Principal created in EMR Master machine 9Eg: knox/ip-xx-xx-xx-xx.ec2.internal@EC2.INTERNAL)",
+      "Type": "String"
+    },
+    "paramEMRMasterMachinePrivateDNS": {
+      "Description": "EMR Master Instance's Private DNS (Eg: ip-10-xx-xx-xx.ec2.internal)",
+      "Type": "String"
+    }
+
+  },
+  "Mappings" : {
+    "AMIs" : {
+      "us-east-1" : {
+        "Name" : "ami-14c5486b"
+      },
+      "us-east-2" : {
+        "Name" : "ami-922914f7"
+      }
+    }
+  },
+  "Resources" : {
+    "resKnoxRangerEC2Instance" : {
+      "Type" : "AWS::EC2::Instance",
+      "Properties" : {
+        "InstanceType" : {
+          "Ref" : "paramInstanceType"
+        },
+        "ImageId" : {
+          "Fn::FindInMap" : [
+            "AMIs",
+            {
+              "Ref" : "AWS::Region"
+            },
+            "Name"
+          ]
+        },
+        "KeyName" : {
+          "Ref" : "paramKeyName"
+        },
+        "IamInstanceProfile" : {
+          "Ref" : "ListS3BucketsInstanceProfile"
+        },
+        "NetworkInterfaces": [
+          {
+            "DeviceIndex": "0",
+            "AssociatePublicIpAddress": "true",
+            "DeleteOnTermination": "true",
+            "SubnetId": {
+              "Ref": "paramEC2Subnet"
+            },
+            "GroupSet": [
+              {
+                "Ref": "paramSecurityGroupId"
+              }
+            ]
+          }
+        ],
+        "Tags" : [
+          {
+            "Key" : "Name",
+            "Value" : "resKnoxRangerEC2Instance"
+          }
+        ],
+        "UserData" :{ "Fn::Base64" : { "Fn::Join" : ["", [
+          "#!/bin/bash -xe\n",
+          "cd /home/ec2-user/; \n",
+          "touch test1; \n",
+          "aws s3 cp s3://skkodali-proserve/knox-blog/knox-install.sh .\n",
+          "sh -x ./knox-install.sh \n",
+          " ", { "Ref" : "paramLdapHostName" },
+          " ", { "Ref" : "paramLdapPort" },
+          " ", { "Ref" : "paramLdapBindUserName" },
+          " ", { "Ref" : "paramLdapBindUserPassword" },
+          " ", { "Ref" : "paramLdapSearchBase" },
+          " ", { "Ref" : "paramLdapUserSearchAttributeName" },
+          " ", { "Ref" : "paramLdapUserObjectClass" },
+          " ", { "Ref" : "paramLdapGroupSearchBase" },
+          " ", { "Ref" : "paramLdapGroupObjectClass" },
+          " ", { "Ref" : "paramLdapMemberAttribute" },
+          " ", { "Ref" : "paramKnoxKerberosPrincipal" },
+          " ", { "Ref" : "paramEMRMasterMachinePrivateDNS" },
+          " > knox-install.log"
+        ]]}}
+      }
+    },
+    "ListS3BucketsInstanceProfile" : {
+      "Type" : "AWS::IAM::InstanceProfile",
+      "Properties" : {
+        "Path" : "/",
+        "Roles" : [
+          {
+            "Ref" : "KNOXBLOGS3BucketsRole"
+          }
+        ]
+      }
+    },
+    "KNOXBLOGS3BucketsPolicy" : {
+      "Type" : "AWS::IAM::Policy",
+      "Properties" : {
+        "PolicyName" : "KNOX-BLOG-S3BucketsPolicy",
+        "PolicyDocument" : {
+          "Statement" : [
+            {
+              "Effect" : "Allow",
+              "Action" : [
+                "s3:*"
+              ],
+              "Resource" : "*"
+            }
+          ]
+        },
+        "Roles" : [
+          {
+            "Ref" : "KNOXBLOGS3BucketsRole"
+          }
+        ]
+      }
+    },
+    "KNOXBLOGS3BucketsRole" : {
+      "Type" : "AWS::IAM::Role",
+      "Properties" : {
+        "AssumeRolePolicyDocument": {
+          "Version" : "2012-10-17",
+          "Statement" : [
+            {
+              "Effect" : "Allow",
+              "Principal" : {
+                "Service" : ["ec2.amazonaws.com"]
+              },
+              "Action" : [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "Path" : "/"
+      }
+    }
+  },
+  "Outputs" : {
+    "EC2" : {
+      "Description" : "EC2 IP address",
+      "Value" : {
+        "Fn::Join" : [
+          "",
+          [
+            "ssh ec2-user@",
+            {
+              "Fn::GetAtt" : [
+                "resKnoxRangerEC2Instance",
+                "PublicIp"
+              ]
+            },
+            " -i ",
+            {
+              "Ref" : "paramKeyName"
+            },
+            ".pem"
+          ]
+        ]
+      }
+    }
+  }
+}

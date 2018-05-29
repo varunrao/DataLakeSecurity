@@ -41,23 +41,53 @@ _setEnv()
     SCRIPTS_S3_BUCKET_LOC="skkodali-proserve/knox-blog"
     JDK_SOFTWARE_FILE_NAME="jdk-8u161-linux-x64.rpm"
     RPM="/bin/rpm"
+
+    MAVEN_VERSION="3.5.3"
+    M2_HOME=/opt/apache-maven-${MAVEN_VERSION}
+    M2_BIN=${M2_HOME}/bin
+    MYSQL="/usr/bin/mysql"
+    RANGER_SOFTWARE_VERSION="1.0.0"
+    RANGER_SOFTWARE_LOCATION="http://apache.claz.org/ranger/${RANGER_SOFTWARE_VERSION}/apache-ranger-${RANGER_SOFTWARE_VERSION}.tar.gz"
+    GUNZIP="/bin/gunzip"
+    TAR="/bin/tar"
+
+    SOLR_SOFTWARE_VERSION="7.3.0"
+    SOLR_SOFTWARE_LOCATION="http://apache.spinellicreations.com/lucene/solr/${SOLR_SOFTWARE_VERSION}/solr-${SOLR_SOFTWARE_VERSION}.tgz"
+
 }
 
-_downloadAndInstallJDKFromS3Bucket()
+_downloadAndInstallMaven()
 {
-    ${AWS} s3 cp s3://${SCRIPTS_S3_BUCKET_LOC}/jdk-8u161-linux-x64.rpm ~/
-    sudo ${RPM} -Uvh ~/${JDK_SOFTWARE_FILE_NAME}
+    cd;
+    ${WGET} http://mirrors.gigenet.com/apache/maven/maven-3/3.5.3/binaries/apache-maven-3.5.3-bin.tar.gz;
+    sudo su -c "tar -zxvf apache-maven-${MAVEN_VERSION}-bin.tar.gz -C /opt";
+    sudo sh -c "echo 'export M2_HOME=/opt/apache-maven-${MAVEN_VERSION}' >> /etc/profile.d/maven.sh"
+    sudo sh -c "echo 'export M2=${M2_HOME}/bin' >> /etc/profile.d/maven.sh"
+    sudo sh -c "echo 'export PATH=${M2_BIN}:$PATH' >> /etc/profile.d/maven.sh"
+    source /etc/profile.d/maven.sh
+
 }
+
 _installRequiredRPMs()
 {
-    # expect tool for passing passwords automatically when you execute this script.
-    sudo yum install -y expect
-    # xmlstarlet tool for editing XML contents.
-    sudo yum install -y xmlstarlet
-    # LDAP diagnostic tools
-    sudo yum install -y sudo yum install -y sssd realmd oddjob oddjob-mkhomedir adcli
-    sudo yum install -y samba-common samba-common-tools krb5-workstation openldap-clients policycoreutils-python
+    sudo yum install -y mysql-connector-java
+    sudo yum -y install mysql-server
+    sudo yum install -y git
+    sudo yum -y install gcc
 }
+
+_Check_MySql_Sql_Connection()
+{
+  SQL_CON=`${MYSQL} -h ${RDS_HOSTNAME} -u ${RDS_ROOT_USERNAME} -p${RDS_ROOT_PASSWORD} -e 'exit;'`
+  if ! [[  ${SQL_CON} == *"CURRENT_TIMESTAMP"* ]]; then
+    echo "SQL Connection to RDS Mysql database is NOT successful."
+    echo "******** Exiting the setup script......"
+    exit 0
+  else
+    echo "SQL Connection to RDS MySQL database is successful....Continuing"
+  fi
+}
+
 _createKnoxUser()
 {
     knoxuserexists=`id knox`
@@ -67,6 +97,56 @@ _createKnoxUser()
         sudo chown ${KNOX_UNIX_USERNAME}:${EC2_USER} ${KNOX_USER_HOME}
         sudo chmod -R 775 ${KNOX_USER_HOME}
     fi
+}
+
+_downloadAndInstallRangerSoftware()
+{
+    cd; mkdir apache-ranger; cd apache-ranger;
+    git clone -b ranger-${RANGER_SOFTWARE_VERSION} https://github.com/apache/ranger.git
+    #RANGER_SOFTWARE_FULL_URL=${RANGER_SOFTWARE_LOCATION}
+    #${WGET} ${RANGER_SOFTWARE_FULL_URL}
+    #${GUNZIP} apache-ranger-${RANGER_SOFTWARE_VERSION}.tar.gz
+    #${TAR} -xvf apache-ranger-${RANGER_SOFTWARE_VERSION}.tar
+    #${LN} -s apache-ranger-${RANGER_SOFTWARE_VERSION} apache-ranger
+    export MAVEN_OPTS="-Xmx512M"; export JAVA_HOME=/usr/java/latest/;
+    cd ~/apache-ranger/ranger;
+    ${M2_BIN}/mvn clean install
+    ${M2_BIN}/mvn compile package assembly:assembly
+    cd /usr/local/
+    sudo tar zxf ~/apache-ranger/ranger/target/ranger-1.0.1-SNAPSHOT-admin.tar.gz
+    sudo ln -s ranger-1.0.1-SNAPSHOT-admin ranger-admin
+
+}
+_downloadnstallAndStartSolr()
+{
+    cd; wget ${SOLR_SOFTWARE_LOCATION}
+    tar -xvf solr-${SOLR_SOFTWARE_VERSION}.tgz
+    cd ~/solr-${SOLR_SOFTWARE_VERSION}/bin
+    export JAVA_HOME=/usr/java/latest
+    ./solr start -p 8983
+}
+_setupMySQLDatabaseAndPrivileges()
+{
+    HOSTNAMEI=`hostname -I`
+    SQL_CON=`${MYSQL} -h ${RDS_HOSTNAME} -u ${RDS_ROOT_USERNAME} -p${RDS_ROOT_PASSWORD} -e \
+    CREATE USER 'rangeradmin'@'localhost' IDENTIFIED BY 'rangeradmin';
+    GRANT ALL PRIVILEGES ON `%`.* TO 'rangeradmin'@'localhost';
+    CREATE USER 'rangeradmin'@'%' IDENTIFIED BY 'rangeradmin';
+    GRANT ALL PRIVILEGES ON `%`.* TO 'rangeradmin'@'%';
+    CREATE USER 'rangeradmin'@'${HOSTNAMEI}' IDENTIFIED BY 'rangeradmin';
+    GRANT ALL PRIVILEGES ON `%`.* TO 'rangeradmin'@'${HOSTNAMEI}';
+    GRANT ALL PRIVILEGES ON `%`.* TO 'rangeradmin'@'${HOSTNAMEI}' WITH GRANT OPTION;
+    GRANT ALL PRIVILEGES ON `%`.* TO 'rangeradmin'@'localhost' WITH GRANT OPTION;
+    GRANT ALL PRIVILEGES ON `%`.* TO 'rangeradmin'@'%' WITH GRANT OPTION;
+    FLUSH PRIVILEGES;
+    'exit;'`
+
+}
+_setupRangerAdmin()
+{
+    cd /usr/local/ranger-admin
+
+
 }
 _downloadAndInstallKnoxSoftware()
 {
@@ -290,6 +370,12 @@ LDAP_MEMBER_ATTRIBUTE="${10}"
 TEMP_S3_BUCKET="${11}"
 KNOX_KERBEROS_PRINCIPAL="${12}"
 EMR_MASTER_MACHINE="${13}"
+
+RDS_HOSTNAME="{14}"
+RDS_ROOT_USERNAME="${15}"
+RDS_ROOT_PASSWORD="${16}"
+
+
 
 : <<'COMMENT'
 LDAP_HOST_NAME="10.0.1.235"
