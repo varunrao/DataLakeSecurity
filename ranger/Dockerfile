@@ -59,7 +59,7 @@ RUN JAVA_HOME=/usr/lib/jvm/default-java ./setup.sh
 WORKDIR /opt/ranger-1.0.0-SNAPSHOT-admin
 RUN sed -i 's|^db_root_password=|db_root_password=admin99|g' "${dadir}/install.properties" 
 RUN sed -i 's|^db_password=|db_password=admin|g' "${dadir}/install.properties" 
-RUN sed -i 's|^db_host=localhost|db_host=mariadb|g' "${dadir}/install.properties" 
+RUN sed -i 's|^db_host=localhost|db_host=mysqldb|g' "${dadir}/install.properties"
 RUN sed -i 's|^audit_solr_urls=|audit_solr_urls=http://localhost:6083/solr/ranger_audits|g' install.properties
 
 # This cannot run unless mysql is active - so must be local, or must be done as 
@@ -82,7 +82,7 @@ EXPOSE          6080 6182 6083 6183
 
 RUN echo "#/bin/sh" > /opt/ranger-1.0.0-SNAPSHOT-admin/ranger-docker-start.sh
 RUN echo "export JAVA_HOME=/usr/lib/jvm/default-java"  >> /opt/ranger-1.0.0-SNAPSHOT-admin/ranger-docker-start.sh
-RUN echo "/usr/local/bin/dockerize -wait tcp://mariadb:3306 -timeout 120s" >> /opt/ranger-1.0.0-SNAPSHOT-admin/ranger-docker-start.sh
+RUN echo "/usr/local/bin/dockerize -wait tcp://mysqldb:3306 -timeout 120s" >> /opt/ranger-1.0.0-SNAPSHOT-admin/ranger-docker-start.sh
 RUN echo "/opt/ranger-1.0.0-SNAPSHOT-admin/setup.sh" >> /opt/ranger-1.0.0-SNAPSHOT-admin/ranger-docker-start.sh
 
 # Now let's start solr 
