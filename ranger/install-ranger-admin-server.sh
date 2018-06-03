@@ -9,6 +9,16 @@ mysql_jar_location=http://central.maven.org/maven2/mysql/mysql-connector-java/5.
 mysql_jar=mysql-connector-java-5.1.39.jar
 ranger_version=$5
 s3bucket_http_url=$6
+
+# Database information
+if [ -z "$7" ]; then
+    db_host_address=locahost
+    db_host_root_password=rangeradmin
+else
+    db_host_address=$7
+    db_host_root_password=$8
+fi
+
 if [ "$ranger_version" == "1.0" ]; then
    ranger_s3bucket=$s3bucket_http_url/ranger/ranger-1.0.1
    ranger_admin_server=ranger-1.0.1-admin
@@ -55,7 +65,8 @@ wget $ranger_s3bucket/solr_for_audit_setup.tar.gz
 tar -xvf $ranger_admin_server.tar.gz
 cd $ranger_admin_server
 sudo sed -i "s|SQL_CONNECTOR_JAR=.*|SQL_CONNECTOR_JAR=$installpath/$mysql_jar|g" install.properties
-sudo sed -i "s|db_root_password=.*|db_root_password=rangeradmin|g" install.properties
+sudo sed -i "s|db_host=.*|db_host=$db_host_address|g" install.properties
+sudo sed -i "s|db_root_password=.*|db_root_password=$db_host_root_password|g" install.properties
 sudo sed -i "s|db_password=.*|db_password=rangeradmin|g" install.properties
 sudo sed -i "s|audit_db_password=.*|audit_db_password=rangerlogger|g" install.properties
 sudo sed -i "s|audit_store=.*|audit_store=solr|g" install.properties
