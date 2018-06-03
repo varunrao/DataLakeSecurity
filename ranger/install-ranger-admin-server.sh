@@ -134,8 +134,8 @@ done
 sudo /opt/solr/ranger_audit_server/scripts/stop_solr.sh || true
 sudo /opt/solr/ranger_audit_server/scripts/start_solr.sh
 #Add the new awss3 configuration
-cd $installpath
-wget $s3bucket_http_url/inputdata/ranger-servicedef-s3.json
-sudo cp /usr/lib/ranger/ranger-0.7.1-admin/ews/webapp/WEB-INF/classes/ranger-plugins/hdfs/ranger-hdfs-plugin-0.7.1.jar /usr/lib/ranger/ranger-0.7.1-admin/ews/webapp/WEB-INF/classes/ranger-plugins/awss3/
-#curl -u admin:admin -X DELETE http://localhost:6080/service/public/v2/api/servicedef/name/awss3
-curl -u admin:admin -X POST -H "Accept: application/json" -H "Content-Type: application/json" http://localhost:6080/service/public/v2/api/servicedef -d @ranger-servicedef-s3.json
+#cd $installpath
+#wget $s3bucket_http_url/inputdata/ranger-servicedef-s3.json
+#sudo cp /usr/lib/ranger/ranger-0.7.1-admin/ews/webapp/WEB-INF/classes/ranger-plugins/hdfs/ranger-hdfs-plugin-0.7.1.jar /usr/lib/ranger/ranger-0.7.1-admin/ews/webapp/WEB-INF/classes/ranger-plugins/awss3/
+##curl -u admin:admin -X DELETE http://localhost:6080/service/public/v2/api/servicedef/name/awss3
+#curl -u admin:admin -X POST -H "Accept: application/json" -H "Content-Type: application/json" http://localhost:6080/service/public/v2/api/servicedef -d @ranger-servicedef-s3.json
