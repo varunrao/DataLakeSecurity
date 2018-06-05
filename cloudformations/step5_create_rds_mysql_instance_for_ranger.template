@@ -1,0 +1,214 @@
+{
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "",
+  "Parameters" :
+  {
+    "paramVPCID": {
+      "Description": "Select the Virtual Private Cloud (VPC) that was created",
+      "Type": "AWS::EC2::VPC::Id"
+    },
+    "ClientIP": {
+      "Description": "The IP address range that can be used to connect to the RDS instances and EC2 instance from your local machine.It must be a valid IP CIDR range of the form x.x.x.x/x.Pls get your address using checkip.amazonaws.com or whatsmyip.org",
+      "Type": "String",
+      "MinLength": "9",
+      "MaxLength": "18",
+      "Default": "0.0.0.0/0",
+      "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+      "ConstraintDescription": "It must be a valid IP CIDR range of the form x.x.x.x/x. Suggest to enable access to your IP address only. Pls get your address using checkip.amazonaws.com or whatsmyip.org."
+    },
+    "MySQLDBInstanceIdentifier": {
+      "Description": " The RDS MySQL database instance identifier",
+      "Type": "String",
+      "Default": "rangerwork",
+      "AllowedValues": [
+        "rangerwork"
+      ]
+    },
+    "MySQLDBInstanceClass": {
+      "Description": " The RDS MySQL database instance type",
+      "Type": "String",
+      "Default": "db.m4.xlarge",
+      "AllowedValues": [
+        "db.m4.xlarge"
+      ],
+      "ConstraintDescription": "For this Blog post we are using db.m4.xlarge instance type."
+    },
+    "MySQLDBName": {
+      "Description": " The RDS MySQL database instance identifier",
+      "Type": "String",
+      "Default": "rangerdb",
+      "AllowedValues": [
+        "rangerdb"
+      ]
+    },
+    "MySQLDBUserName": {
+      "Description": " The RDS MySQL database username",
+      "Type": "String",
+      "Default": "root",
+      "AllowedValues": [
+        "root"
+      ]
+    },
+    "MySQLDBPassword": {
+      "Description": " The RDS MySQL database password",
+      "Type": "String",
+      "Default": "Rootroot123",
+      "AllowedValues": [
+        "Rootroot123"
+      ]
+    },
+    "MySQLDBAllocatedStorage": {
+      "Description": " The RDS MySQL database size (Gb)",
+      "Type": "Number",
+      "Default": "100",
+      "AllowedValues": [
+        "100"
+      ]
+    }
+  },
+  "Resources" : {
+    "resMySQLSubnetGroup": {
+      "Type": "AWS::RDS::DBSubnetGroup",
+      "Properties": {
+        "DBSubnetGroupDescription": "Subnet available for the RDS DB Instance.",
+        "SubnetIds":[
+          {
+            "Ref": "resPublicSubnetInAZ1A"
+          },
+          {
+            "Ref": "resPublicSubnetInAZ1B"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "cfn"
+          }
+        ]
+      }
+    },
+    "resPublicSubnetInAZ1A": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "paramVPCID"
+        },
+        "AvailabilityZone": "us-east-1a",
+        "CidrBlock": "10.0.2.0/24",
+        "MapPublicIpOnLaunch": "True",
+        "Tags": [{
+          "Key": "Name",
+          "Value": "security-workshop-public-subnet-1a"
+        }]
+      }
+    },
+    "resPublicSubnetInAZ1B": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Ref": "paramVPCID"
+        },
+        "AvailabilityZone": "us-east-1b",
+        "CidrBlock": "10.0.3.0/24",
+        "MapPublicIpOnLaunch": "True",
+        "Tags": [{
+          "Key": "Name",
+          "Value": "security-workshop-public-subnet-1a"
+        }]
+      }
+    },
+    "resSGBase": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": "ora2pgblogsecuritygroup",
+        "GroupDescription": "Base Security Group",
+        "VpcId": {
+          "Ref": "paramVPCID"
+        },
+        "SecurityGroupEgress": [
+          {
+            "CidrIp": "0.0.0.0/0",
+            "IpProtocol": "-1",
+            "FromPort": -1,
+            "ToPort": -1
+          }
+        ],
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": {
+              "Ref": "ClientIP"
+            },
+            "FromPort": "22",
+            "ToPort": "22"
+          },
+          {
+            "IpProtocol": "tcp",
+            "CidrIp": {
+              "Ref": "ClientIP"
+            },
+            "FromPort": "5432",
+            "ToPort": "5432"
+          }
+        ]
+      }
+    },
+    "resSGBaseIngress": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Fn::GetAtt": [
+            "resSGBase",
+            "GroupId"
+          ]
+        },
+        "IpProtocol": "-1",
+        "FromPort": "-1",
+        "ToPort": "-1",
+        "SourceSecurityGroupId": {
+          "Fn::GetAtt": [
+            "resSGBase",
+            "GroupId"
+          ]
+        }
+      }
+    },
+    "resMySQLDB": {
+      "Type": "AWS::RDS::DBInstance",
+      "Properties": {
+        "DBName": {
+          "Ref": "MySQLDBName"
+        },
+        "DBInstanceIdentifier": {
+          "Ref": "MySQLDBInstanceIdentifier"
+        },
+        "AllocatedStorage": {
+          "Ref": "MySQLDBAllocatedStorage"
+        },
+        "DBInstanceClass": {
+          "Ref": "MySQLDBInstanceClass"
+        },
+        "Engine": "mysql",
+        "MasterUsername": {
+          "Ref": "MySQLDBUserName"
+        },
+        "MasterUserPassword": {
+          "Ref": "MySQLDBPassword"
+        },
+        "DBSubnetGroupName": {
+          "Ref": "resMySQLSubnetGroup"
+        },
+        "VPCSecurityGroups": [
+          {
+            "Ref": "resSGBase"
+          }
+        ],
+        "AvailabilityZone": "us-east-1a",
+        "MultiAZ": "false",
+        "StorageType": "io1",
+        "Iops": "1000"
+      }
+    }
+  }
+}

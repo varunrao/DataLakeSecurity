@@ -58,6 +58,9 @@ _setEnv()
     RANGER_UNIX_GROUPNAME="ranger"
     RANGER_USER_HOME="/home/ranger"
     EC2_USER="ec2-user"
+    KEY_TAB_LOCATION="/mnt/var/lib/bigtop_keytabs/"
+    MYSQL_CONNECTOR_JAR="/usr/share/java/mysql-connector-java.jar"
+
 
 }
 _installRequiredRPMs()
@@ -149,6 +152,40 @@ _setupMySQLDatabaseAndPrivileges()
     echo $?
 }
 
+_downloadKeyTabAndKRB5FilesFromS3Bucket()
+{
+    sudo mkdir -p ${KEY_TAB_LOCATION}
+
+    sudo ${AWS} ${S3_COPY} ${TEMP_S3_LOCATION}/rangeradmin.keytab ${KEY_TAB_LOCATION}/
+    if [ "$?" != "0" ]; then
+        print "Unable to download rangeradmin.keytab file from S3. Exiting..."
+        exit 99
+    fi
+    sudo ${AWS} ${S3_COPY} ${TEMP_S3_LOCATION}/rangerlookup.keytab ${KEY_TAB_LOCATION}/
+    if [ "$?" != "0" ]; then
+        print "Unable to download rangerlookup.keytab file from S3. Exiting..."
+        exit 99
+    fi
+
+    sudo ${AWS} ${S3_COPY} ${TEMP_S3_LOCATION}/rangerusersync.keytab ${KEY_TAB_LOCATION}/
+    if [ "$?" != "0" ]; then
+        print "Unable to download rangerusersync.keytab file from S3. Exiting..."
+        exit 99
+    fi
+    sudo ${AWS} ${S3_COPY} ${TEMP_S3_LOCATION}/rangertagsync.keytab ${KEY_TAB_LOCATION}/
+    if [ "$?" != "0" ]; then
+        print "Unable to download rangertagsync.keytab file from S3. Exiting..."
+        exit 99
+    fi
+
+    sudo ${AWS} ${S3_COPY} ${TEMP_S3_LOCATION}/HTTP.keytab ${KEY_TAB_LOCATION}/
+    if [ "$?" != "0" ]; then
+        print "Unable to download HTTP.keytab file from S3. Exiting..."
+        exit 99
+    fi
+
+}
+
 _updateRangerAdminProperties()
 {
 
@@ -181,8 +218,19 @@ _updateRangerAdminProperties()
     sudo sed -i "s|xa_ldap_referral=.*|xa_ldap_referral=${LDAP_REFERRAL}|g" install.properties
     sudo sed -i "s|xa_ldap_userSearchFilter=.*|xa_ldap_userSearchFilter=${LDAP_USER_SEARCH_FILTER}|g" install.properties
 
-}
+    sudo sed -i "s|spnego_principal=.*|spnego_principal=HTTP/${EMR_MASTER_MACHINE}@${DOMAIN_NAME}|g" install.properties
+    sudo sed -i "s|spnego_keytab=.*|spnego_keytab=${KEY_TAB_LOCATION}/HTTP.keytab|g" install.properties
+    sudo sed -i "s|token_value=.*|token_value=30|g" install.properties
 
+    sudo sed -i "s|cookie_domain=.*|cookie_domain=${EMR_MASTER_MACHINE}|g" install.properties
+    sudo sed -i "s|cookie_path=.*|cookie_path=/|g" install.properties
+    sudo sed -i "s|admin_principal=.*|admin_principal=rangeradmin/${EMR_MASTER_MACHINE}@${DOMAIN_NAME}|g" install.properties
+    sudo sed -i "s|admin_keytab=.*|admin_keytab=${KEY_TAB_LOCATION}/rangeradmin.keytab|g" install.properties
+    sudo sed -i "s|lookup_principal=.*|lookup_principal=rangerlookup/${EMR_MASTER_MACHINE}@${DOMAIN_NAME}|g" install.properties
+    sudo sed -i "s|lookup_keytab=.*|lookup_keytab=${KEY_TAB_LOCATION}/rangerlookup.keytab|g" install.properties
+    sudo sed -i "s|hadoop_conf=.*|hadoop_conf=/etc/hadoop/conf|g" install.properties
+
+}
 
 _startRangerAdmin()
 {
@@ -200,27 +248,30 @@ _startRangerAdmin()
 
 _updateRangerUserSyncProperties()
 {
-
     cd /usr/local/ranger-usersync;
     HOSTNAMEI=`hostname -I`
     HOSTNAMEI=`echo ${HOSTNAMEI}`
     #sudo cp install.properties install.properties.orig
     #sudo sed -i "s|SQL_CONNECTOR_JAR=.*|SQL_CONNECTOR_JAR=$installpath/$mysql_jar|g" install.properties
     sudo sed -i "s|logdir=.*|logdir=/var/log/ranger/usersync|g" install.properties
-    sudo sed -i "s|POLICY_MGR_URL=.*|POLICY_MGR_URL=http://${HOSTNAMEI}:6080|g" install.properties
-    sudo sed -i "s|SYNC_SOURCE=.*|SYNC_SOURCE=ldap|g" install.properties
+    sudo sed -i "s|POLICY_MGR_URL =.*|POLICY_MGR_URL=http://${HOSTNAMEI}:6080|g" install.properties
+    sudo sed -i "s|SYNC_SOURCE =.*|SYNC_SOURCE=ldap|g" install.properties
 
-    sudo sed -i "s|SYNC_LDAP_URL=.*|SYNC_LDAP_URL=${LDAP_SERVER_URL}|g" install.properties
-    sudo sed -i "s|SYNC_LDAP_BIND_DN=.*|SYNC_LDAP_BIND_DN=${LDAP_BIND_DN}|g" install.properties
-    sudo sed -i "s|SYNC_LDAP_BIND_PASSWORD=.*|SYNC_LDAP_BIND_PASSWORD=${LDAP_BIND_USER_PASSWORD}|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_URL =.*|SYNC_LDAP_URL=${LDAP_SERVER_URL}|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_BIND_DN =.*|SYNC_LDAP_BIND_DN=${LDAP_BIND_DN}|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_BIND_PASSWORD =.*|SYNC_LDAP_BIND_PASSWORD=${LDAP_BIND_USER_PASSWORD}|g" install.properties
 
-    sudo sed -i "s|SYNC_LDAP_SEARCH_BASE=.*|SYNC_LDAP_SEARCH_BASE=${LDAP_GROUP_SEARCH_BASE}|g" install.properties
-    sudo sed -i "s|SYNC_LDAP_USER_SEARCH_BASE=.*|SYNC_LDAP_USER_SEARCH_BASE=${LDAP_GROUP_SEARCH_BASE}|g" install.properties
-    sudo sed -i "s|SYNC_LDAP_USER_SEARCH_FILTER=.*|SYNC_LDAP_USER_SEARCH_FILTER=${LDAP_USER_SYNC_SEARCH_FILTER}|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_SEARCH_BASE =.*|SYNC_LDAP_SEARCH_BASE=${LDAP_GROUP_SEARCH_BASE}|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_USER_SEARCH_BASE =.*|SYNC_LDAP_USER_SEARCH_BASE=${LDAP_GROUP_SEARCH_BASE}|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_USER_SEARCH_FILTER =.*|SYNC_LDAP_USER_SEARCH_FILTER=${LDAP_USER_SYNC_SEARCH_FILTER}|g" install.properties
 
-    sudo sed -i "s|SYNC_LDAP_USER_NAME_ATTRIBUTE=.*|SYNC_LDAP_USER_NAME_ATTRIBUTE=${LDAP_USER_NAME_SYNC_ATTRIBUTE}|g" install.properties
-    sudo sed -i "s|SYNC_INTERVAL=.*|SYNC_INTERVAL=2|g" install.properties
-    sudo sed -i "s|SYNC_LDAP_REFERRAL=.*|SYNC_LDAP_REFERRAL=follow|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_USER_NAME_ATTRIBUTE =.*|SYNC_LDAP_USER_NAME_ATTRIBUTE=${LDAP_USER_NAME_SYNC_ATTRIBUTE}|g" install.properties
+    sudo sed -i "s|SYNC_INTERVAL =.*|SYNC_INTERVAL=2|g" install.properties
+    sudo sed -i "s|SYNC_LDAP_REFERRAL =.*|SYNC_LDAP_REFERRAL=follow|g" install.properties
+
+    sudo sed -i "s|usersync_principal=.*|usersync_principal=rangerusersync/${EMR_MASTER_MACHINE}@${DOMAIN_NAME}|g" install.properties
+    sudo sed -i "s|usersync_keytab=.*|usersync_keytab=${KEY_TAB_LOCATION}/rangerusersync.keytab|g" install.properties
+    sudo sed -i "s|hadoop_conf=.*|hadoop_conf=/etc/hadoop/conf|g" install.properties
 
 }
 
@@ -237,7 +288,6 @@ _startRangerUserSync()
     sudo service ranger-usersync start
 
 }
-
 ####MAIN#######
 : <<'COMMENT'
 if [ "$#" -ne 19 ]; then
@@ -261,6 +311,9 @@ if [ "$#" -ne 19 ]; then
                 LDAP_USER_SEARCH_FILTER \
                 LDAP_USER_SYNC_SEARCH_FILTER \
                 LDAP_USER_NAME_SYNC_ATTRIBUTE \
+                TEMP_S3_LOCATION \
+                EMR_MASTER_MACHINE \
+                DOMAIN_NAME \
                 "
   exit 1
 fi
@@ -287,6 +340,9 @@ LDAP_REFERRAL="${16}"
 LDAP_USER_SEARCH_FILTER="${17}"
 LDAP_USER_SYNC_SEARCH_FILTER="${18}"
 LDAP_USER_NAME_SYNC_ATTRIBUTE="${19}"
+TEMP_S3_LOCATION="${20}"
+EMR_MASTER_MACHINE="${21}"
+DOMAIN_NAME="${22}"
 #LDAP_BIND_USERNAME="${9}"
 
 LDAP_SERVER_URL="ldap://${LDAP_HOST_NAME}:${LDAP_PORT}"
@@ -314,6 +370,10 @@ LDAP_USER_SEARCH_FILTER="(sAMAccountName={0})"
 LDAP_USER_SYNC_SEARCH_FILTER="sAMAccountName=*"
 LDAP_USER_NAME_SYNC_ATTRIBUTE="sAMAccountName"
 LDAP_SERVER_URL="ldap://${LDAP_HOST_NAME}:${LDAP_PORT}"
+TEMP_S3_LOCATION="s3://skkodali-public/blogs/keytab-files"
+EMR_MASTER_MACHINE="ip-10-0-1-25.ec2.internal"
+DOMAIN_NAME="EC2.INTERNAL"
+
 #LDAP_BIND_USERNAME="CN=AWS ADMIN,CN=Users,DC=awsknox,DC=com"
 
 #### CALLING FUNCTIONS ####
@@ -326,6 +386,7 @@ _setEnv
 #_downloadAndInstallAndStartSolr
 #_generateSQLGrantsAndCreateUser
 #_setupMySQLDatabaseAndPrivileges
+#_downloadKeyTabAndKRB5FilesFromS3Bucket
 #_updateRangerAdminProperties
 #_startRangerAdmin
 _updateRangerUserSyncProperties
