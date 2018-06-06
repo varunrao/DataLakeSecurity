@@ -1,6 +1,6 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
-  "Description" : "Attach IAM Role to an EC2",
+  "Description" : "Creating Knox EC2 instance",
   "Parameters" : {
     "paramKeyName": {
       "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instance",
@@ -57,7 +57,7 @@
     "paramLdapSearchBase": {
       "Description": "Provide Ldap Search Base",
       "Type": "String",
-      "Default": "CN=Users,DC=awshadoop,DC=com"
+      "Default": "CN=Users,DC=awsknox,DC=com"
     },
     "paramLdapUserSearchAttributeName": {
       "Description": "Provide Ldap User Search Attribute Name",
@@ -72,7 +72,7 @@
     "paramLdapGroupSearchBase": {
       "Description": "Provide Ldap Group Search base",
       "Type": "String",
-      "Default": "dc=awshadoop,dc=com"
+      "Default": "dc=awsknox,dc=com"
     },
     "paramLdapGroupObjectClass": {
       "Description": "Provide Ldap Group Object Class",
@@ -88,9 +88,10 @@
       "Description": "Provide S3 Bucket Location where the krb5.conf and knox keytabl files exists.",
       "Type": "String"
     },
-    "paramKnoxKerberosPrincipal": {
-      "Description": "Knox Kerberos Principal created in EMR Master machine 9Eg: knox/ip-xx-xx-xx-xx.ec2.internal@EC2.INTERNAL)",
-      "Type": "String"
+    "paramKerberosRealm": {
+      "Description": "Kerberos Realm Name (Eg: EC2.INTERNAL)",
+      "Type": "String",
+      "Default" : "EC2.INTERNAL"
     },
     "paramEMRMasterMachinePrivateDNS": {
       "Description": "EMR Master Instance's Private DNS (Eg: ip-10-xx-xx-xx.ec2.internal)",
@@ -105,6 +106,9 @@
       },
       "us-east-2" : {
         "Name" : "ami-922914f7"
+      },
+      "us-west-2" : {
+        "Name" : "ami-e251209a"
       }
     }
   },
@@ -155,8 +159,8 @@
           "#!/bin/bash -xe\n",
           "cd /home/ec2-user/; \n",
           "touch test1; \n",
-          "aws s3 cp s3://skkodali-proserve/knox-blog/knox-install.sh .\n",
-          "sh -x ./knox-install.sh \n",
+          "aws s3 cp s3://skkodali-proserv-us-west-2/knox-blog/scripts/knox/knox-install.sh .\n",
+          "sh -x ./knox-install.sh ",
           " ", { "Ref" : "paramLdapHostName" },
           " ", { "Ref" : "paramLdapPort" },
           " ", { "Ref" : "paramLdapBindUserName" },
@@ -167,8 +171,9 @@
           " ", { "Ref" : "paramLdapGroupSearchBase" },
           " ", { "Ref" : "paramLdapGroupObjectClass" },
           " ", { "Ref" : "paramLdapMemberAttribute" },
-          " ", { "Ref" : "paramKnoxKerberosPrincipal" },
+          " ", { "Ref" : "paramTempS3Bucket" },
           " ", { "Ref" : "paramEMRMasterMachinePrivateDNS" },
+          " ", { "Ref" : "paramKerberosRealm" },
           " > knox-install.log"
         ]]}}
       }

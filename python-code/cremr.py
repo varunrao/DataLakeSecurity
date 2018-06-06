@@ -78,7 +78,7 @@ def create(event, context):
                     "HadoopJarStep": {
                         "Jar": "s3://elasticmapreduce/libs/script-runner/script-runner.jar",
                         "Args": [
-                            "s3://skkodali-proserve/knox-blog/knox-kerberos-setup-on-emr.sh",
+                            "s3://skkodali-proserv-us-west-2/knox-blog/scripts/knox/knox-kerberos-setup-on-emr.sh",
                             event["ResourceProperties"]["TempS3Location"]
                         ]
                     }

@@ -45,11 +45,10 @@ _uploadKeyTabAndKRB5FilesToS3Bucket()
 #  exit 1
 # fi
 
-: <<'COMMENT'
-TEMP_S3_BUCKET_PATH="${1}"
-COMMENT
 
-TEMP_S3_BUCKET_PATH="s3://skkodali-proserve/knox-blog"
+TEMP_S3_BUCKET_PATH="${1}"
+
+# TEMP_S3_BUCKET_PATH="s3://skkodali-proserve/knox-blog"
 
 #### CALLING FUNCTIONS ####
 

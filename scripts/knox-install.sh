@@ -18,6 +18,11 @@ _usage()
             'knox/ip-10-0-1-25.ec2.internal@EC2.INTERNAL'
             'ip-10-0-1-25.ec2.internal'
          "
+         ## Once this script is executed, run the below commands on on the KNOX instance.
+         ## sudo su - knox
+         ## knox/bin/knoxcli.sh create-master --> Provide password : for eg: CheckSum123
+         ## cd knox/bin
+         ## ./gateway.sh start
 }
 _setEnv()
 {
@@ -99,13 +104,15 @@ _createKnoxMasterSecret()
 {
     if [ -d "${KNOX_GATEWAY_HOME}" ]; then
          cd ${KNOX_GATEWAY_HOME}/bin
+         sudo chmod -R 777 ${KNOX_GATEWAY_HOME}/logs/
 
          /usr/bin/expect << EOF
-         spawn ${KNOX_GATEWAY_HOME}/bin/knoxcli.sh create-master --force
-         expect "Enter master secret:\r"
-         send "${KNOX_GATEWAY_MASTER_PASSWORD}\r"
-         expect "Enter master secret again:\r"
-         send "${KNOX_GATEWAY_MASTER_PASSWORD}\r"
+         set timeout -1
+         spawn /bin/su knox ${KNOX_GATEWAY_HOME}/bin/knoxcli.sh create-master
+         expect "Enter master secret:"
+         send "${KNOX_GATEWAY_MASTER_PASSWORD}\n"
+         expect "Enter master secret again:"
+         send "${KNOX_GATEWAY_MASTER_PASSWORD}\n"
 EOF
 
          if [ "$?" = "0" ]; then
@@ -288,23 +295,26 @@ LDAP_GROUP_SEARCH_BASE="${8}"
 LDAP_GROUP_OBJECT_CLASS="${9}"
 LDAP_MEMBER_ATTRIBUTE="${10}"
 TEMP_S3_BUCKET="${11}"
-KNOX_KERBEROS_PRINCIPAL="${12}"
-EMR_MASTER_MACHINE="${13}"
+EMR_MASTER_MACHINE="${12}"
+KERBEROS_REALM="${13}"
+KNOX_KERBEROS_PRINCIPAL="knox/${EMR_MASTER_MACHINE}@${KERBEROS_REALM}"
 
 : <<'COMMENT'
-LDAP_HOST_NAME="10.0.1.235"
+
+LDAP_HOST_NAME="awsknox.com"
 LDAP_PORT="389"
 LDAP_BIND_USERNAME="CN=AWS ADMIN,CN=Users,DC=awshadoop,DC=com"
 LDAP_BIND_USER_PASSWORD="CheckSum123"
-LDAP_SEARCH_BASE="CN=Users,DC=awshadoop,DC=com"
+LDAP_SEARCH_BASE="CN=Users,DC=awsknox,DC=com"
 LDAP_USER_SEARCH_ATTRIBUTE_NAME="sAMAccountName"
 LDAP_USER_OBJECT_CLASS="person"
-LDAP_GROUP_SEARCH_BASE="dc=awshadoop,dc=com"
+LDAP_GROUP_SEARCH_BASE="dc=awsknox,dc=com"
 LDAP_GROUP_OBJECT_CLASS="group"
 LDAP_MEMBER_ATTRIBUTE="member"
-TEMP_S3_BUCKET="s3://skkodali-proserve/knox-blog"
-KNOX_KERBEROS_PRINCIPAL="knox/ip-10-0-1-25.ec2.internal@EC2.INTERNAL"
-EMR_MASTER_MACHINE="ip-10-0-1-25.ec2.internal"
+TEMP_S3_BUCKET="s3://skkodali-proserv-us-west-2/knox-blog"
+EMR_MASTER_MACHINE="ip-10-0-1-5.us-west-2.compute.internal"
+KERBEROS_REALM="EC2.INTERNAL"
+KNOX_KERBEROS_PRINCIPAL="knox/${EMR_MASTER_MACHINE}@${KERBEROS_REALM}"
 COMMENT
 #### CALLING FUNCTIONS ####
 
@@ -313,9 +323,10 @@ _downloadAndInstallJDKFromS3Bucket
 _installRequiredRPMs
 _createKnoxUser
 _downloadAndInstallKnoxSoftware
-_createKnoxMasterSecret
+#_createKnoxMasterSecret
 _updateKnoxGatewayPortInGatewaySiteXML
 _createATopologyFile
 _downloadKeyTabAndKRB5FilesFromS3Bucket
 _createkrb5JAASLoginCOnfFile
 _updateKerberosInfoInGatewaySiteXML
+#_startKnoxGateway

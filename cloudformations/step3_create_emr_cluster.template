@@ -114,7 +114,7 @@
     "TypeOfInstance": {
       "Description": "Instance type for the cluster nodes",
       "Type": "String",
-      "Default": "m4.xlarge",
+      "Default": "m4.2xlarge",
       "AllowedValues": [
         "m4.large",
         "m4.xlarge",
@@ -125,12 +125,12 @@
     "AppsEMR": {
       "Description": "Comma separated list of applications to install on the cluster e.g., ",
       "Type": "String",
-      "Default": "Hadoop, Spark, Ganglia, Hive"
+      "Default": "Hadoop, Spark, Ganglia, Hive, HBase, Livy, ZooKeeper , Hue, Oozie, Phoenix, Pig, Presto, HCatalog, Ganglia"
     },
     "TempS3Location": {
       "Description": "Temporary S3 bucket path in your AWS account. krb5.conf and knox key tab files will be uploaded from EMR master machine. These files will be downloaded from this S3 location into Knox EC2 instance.",
       "Type": "String",
-      "Default": "s3://skkodali-proserve/knox-blog"
+      "Default": "s3://skkodali-proserv-us-west-2/knox-blog"
     }
   },
 
@@ -234,7 +234,7 @@
         "Handler": "cremr.handler",
         "Role": { "Fn::GetAtt" : ["LambdaExecutionRole", "Arn"] },
         "Code": {
-          "S3Bucket": "skkodali-proserve",
+          "S3Bucket": "skkodali-proserv-us-west-2",
           "S3Key": "knox-blog/LaunchCluster.zip"
         },
         "Runtime": "python3.6",
